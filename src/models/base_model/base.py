@@ -1,7 +1,8 @@
-from sklearn.utils import shuffle
+import numpy as np
 import tensorflow as tf
 import tensorflow.contrib.layers as layers
 
+from sklearn.utils import shuffle
 from tqdm import tqdm
 
 
@@ -86,16 +87,9 @@ class BaseModel:
 
     @property
     def num_weights(self):
-        return len(
-            tf.get_collection(
-                key=tf.GraphKeys.GLOBAL_VARIABLES,
-                scope=self.scope
-            )
-        )
+        variables = tf.trainable_variables(scope=self.scope)
+        return sum([np.prod(v.shape.as_list()) for v in variables])
 
     @property
     def get_weights(self):
-        return tf.get_collection(
-            key=tf.GraphKeys.GLOBAL_VARIABLES,
-            scope=self.scope
-        )
+        return tf.trainable_variables(scope=self.scope)
