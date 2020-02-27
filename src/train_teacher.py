@@ -9,7 +9,9 @@ DATA_PATH = "../data/synthetic_data/first_dataset"
 
 
 def train_and_save_model(model, folder, num_epochs):
-    inputs = np.load(os.path.join(DATA_PATH, "inputs.npz")).reshape(-1, 1)
+    inputs = np.load(os.path.join(
+        DATA_PATH, "inputs.npz")
+    ).reshape(-1, 1)
     targets = np.load(os.path.join(
         DATA_PATH, "targets.npz")
     ).reshape(-1, 1)
@@ -24,6 +26,7 @@ def train_and_save_model(model, folder, num_epochs):
 def load_model(model, folder):
     model.load(os.path.join("../saved_models", folder))
     print(model.num_weights)
+    print(model.get_weights)
 
 
 if __name__ == "__main__":

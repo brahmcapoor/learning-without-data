@@ -3,6 +3,7 @@ from gym import error, spaces, utils
 from gym.utils import seeding
 
 import numpy as np
+import os
 
 import tensorflow as tf
 
@@ -12,8 +13,17 @@ from models.teacher_model import TeacherModel
 
 class TeachingEnv(gym.Env):
 
-    def __init__(self):
+    def __init__(self, teacher_path, validation_path):
 
+        self.validation_inputs = np.load(os.path.join(
+            validation_path, "inputs.npz")
+        ).reshape(-1, 1)
+        self.validation_targets = np.load(os.path.join(
+            validation_path, "targets.npz")
+        ).reshape(-1, 1)
+
+        self.student_queries = 0
+        self.max_queries = 100
         self.teacher_model = TeacherModel(
             input_dim=1,
             target_dim=1,
@@ -21,9 +31,7 @@ class TeachingEnv(gym.Env):
             activation=tf.nn.sigmoid,
             lr=1e-4
         )
-        self.teacher_model.load(
-            '/Users/brahm/Dev/classes/cs234/learning-without-data/src/'
-        )
+        self.teacher_model.load(teacher_path)
 
         self.student_model = StudentModel(
             input_dim=1,
@@ -32,6 +40,7 @@ class TeachingEnv(gym.Env):
             activation=tf.nn.sigmoid,
             lr=0.01
         )
+        # self.sess.run(tf.global_variables_initializer())
 
         self.num_queries = 1  # TODO
         self.action_space_low = -np.inf  # TODO
@@ -48,23 +57,48 @@ class TeachingEnv(gym.Env):
         self.observation_space = spaces.Box(
             low=self.observation_space_low,
             high=self.observation_space_high,
-            shape=(self.student_model.get_num_weights(), )
+            shape=(self.student_model.num_weights + 4, )
         )
 
     def step(self, action):
-        obs = None
-        reward = None
-        done = False
+        """
+        Action is a (1,) numpy array
+        """
+        action = action.reshape(-1, 1)  # dimensionality case
+        teacher_output = self.teacher_model(action)
+        student_output, MSE_loss, _ = self.student_model.train_step(
+            action, teacher_output
+        )
+        _, validation_loss = self.student_model.validate(
+            self.validation_inputs,
+            self.validation_targets
+        )
+        obs = np.hstack(
+            [
+                self.student_model.weights,
+                np.array(
+                    [
+                        np.asscalar(action),
+                        np.asscalar(teacher_output),
+                        np.asscalar(student_output),
+                        MSE_loss
+                    ]
+                )
+            ]
+        )
         info = {}
-        return (obs, reward, done, info)  # state, reward, isterminal, metadata
+        self.student_queries += 1
+        done = (self.student_queries == self.max_queries)
+        # state, reward, isterminal, metadata
+        return (obs, -validation_loss, done, info)
 
     def reset(self):
         """
-        Upon reaching end of episode, go back to 
+        Upon reaching end of episode, go back to
         initialization state
         """
-        obs = None
-        return None
+        obs = np.hstack([self.student_model.weights, np.zeros((4,))])
+        return obs
 
     def render(self, mode='human', close=False):
-        print("TODO: Render stuff here")
+        pass

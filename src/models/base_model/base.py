@@ -16,7 +16,7 @@ class BaseModel:
         self.lr = lr
         self.sess = tf.Session()
         self.scope = scope
-        self.build()
+        self._build()
 
     def _add_placeholders_op(self):
         self.inputs_placeholder = tf.placeholder(
@@ -52,14 +52,23 @@ class BaseModel:
     def _add_optimizer_op(self):
         self.train_op = tf.train.AdamOptimizer(self.lr).minimize(self.loss)
 
-    def build(self):
+    def _build(self):
         self._add_placeholders_op()
         self.forward_pass = self._add_forward_pass()
         self._add_loss_op()
         self._add_optimizer_op()
+        self.sess.run(tf.global_variables_initializer())
+
+    def train_step(self, inputs, targets):
+        return self.sess.run(
+            [self.forward_pass, self.loss, self.train_op],
+            feed_dict={
+                self.inputs_placeholder: inputs,
+                self.targets_placeholder: targets
+            }
+        )
 
     def train(self, inputs, targets, epochs, batch_size=64):
-        self.sess.run(tf.global_variables_initializer())
         batch_loss = float('inf')
         prog = tqdm(range(epochs),
                     postfix={'Batch Loss': batch_loss})
@@ -67,15 +76,20 @@ class BaseModel:
             for i in range(0, len(inputs), batch_size):
                 inputs_batch = inputs[i: i+batch_size]
                 targets_batch = targets[i: i+batch_size]
-                forward_pass_out, batch_loss, _ = self.sess.run(
-                    [self.forward_pass, self.loss, self.train_op],
-                    feed_dict={
-                        self.inputs_placeholder: inputs_batch,
-                        self.targets_placeholder: targets_batch
-                    }
+                forward_pass_out, batch_loss, _ = self.train_step(
+                    inputs_batch,
+                    targets_batch
                 )
-
             prog.set_postfix({'Batch Loss': batch_loss})
+
+    def validate(self, inputs, targets):
+        return self.sess.run(
+            [self.forward_pass, self.loss],
+            feed_dict={
+                self.inputs_placeholder: inputs,
+                self.targets_placeholder: targets
+            }
+        )
 
     def dump(self, path):
         saver = tf.train.Saver()
@@ -85,11 +99,30 @@ class BaseModel:
         saver = tf.train.Saver()
         saver.restore(self.sess, tf.train.latest_checkpoint(model_dir))
 
+    def __call__(self, inputs):
+        inputs = inputs.reshape(-1, 1)
+        output = self.sess.run(
+            self.forward_pass,
+            feed_dict={
+                self.inputs_placeholder: inputs
+            }
+        )
+        return output
+
     @property
     def num_weights(self):
         variables = tf.trainable_variables(scope=self.scope)
         return sum([np.prod(v.shape.as_list()) for v in variables])
 
     @property
-    def get_weights(self):
-        return tf.trainable_variables(scope=self.scope)
+    def weights(self):
+        variables = tf.trainable_variables(scope=self.scope)
+
+        flattened_vars = []
+        for variable in variables:
+            variable_val = self.sess.run(variable)
+            variable_flattened = np.ndarray.flatten(variable_val)
+            flattened_vars.append(variable_flattened)
+
+        stacked_vars = np.hstack(np.array(flattened_vars))
+        return stacked_vars
