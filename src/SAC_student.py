@@ -5,14 +5,14 @@ import gym
 import numpy as np
 import tensorflow as tf
 from tqdm import tqdm
+from stable_baselines.sac.policies import MlpPolicy
+from stable_baselines import SAC
 import matplotlib.pyplot as plt
-import config
-
 
 import learningwithoutdata
+import config
 
 DATA_PATH = "../data/synthetic_data/first_dataset"
-
 
 def main():
     env = gym.make(
@@ -22,7 +22,11 @@ def main():
             "../saved_models",
             sys.argv[1]
         ),
-        validation_path=DATA_PATH)
+        validation_path=DATA_PATH,
+        max_queries=config.MAX_QUERIES)
+    agent_model = SAC(MlpPolicy, env, random_exploration=config.EPSILON_EXPLORATION, verbose=1)
+    agent_model.learn(total_timesteps=config.MAX_QUERIES * config.NUM_TRAIN_EPISODES)
+
     obs = env.reset()
 
     reward = float('-inf')
@@ -31,42 +35,23 @@ def main():
         postfix={'Reward': reward}
     )
 
-    # Plot student's initialized predicted function
-    '''inputs = np.linspace(-5, 5, num=1000)
-    outputs = env.student_model(inputs.reshape(-1, 1))
-    plt.scatter(inputs, outputs, s=0.1, label='Initialized')
-    plt.title("Initialized Student's Approximation")
-    plt.savefig('./visualizations/functions/initialized')
-    plt.clf()'''
-
     actions = [] # For visualization
     for i in prog:
-        action = np.random.uniform(-5, 5, size=(1,))
+        action, _states = agent_model.predict(obs)
         obs, reward, done, info = env.step(action)
         prog.set_postfix({'Reward': reward})
         actions.append(np.asscalar(action)) 
     plt.hist(actions, bins=config.NUM_BINS, range=(-5, 5), density=True)
-    plt.savefig('./visualizations/histograms/random')
+    plt.savefig('./visualizations/histograms/SAC')
     plt.clf()
-
-    # Plot teacher's function
-    '''plt.scatter(env.validation_inputs.reshape(-1), env.validation_targets.reshape(-1), s=0.1, label='Teacher')
-    plt.title("Teacher Function")
-    plt.savefig('./visualizations/functions/teacher')
-    plt.clf()'''
 
     # Plot student's predicted function
     inputs = np.linspace(-5, 5, num=1000)
     outputs = env.student_model(inputs.reshape(-1, 1))
-    plt.scatter(inputs, outputs, s=0.1, label='Random')
-    plt.title("Random Student's Approximation")
-    plt.savefig('./visualizations/functions/random')
+    plt.scatter(inputs, outputs, s=0.1, label='SAC')
+    plt.title("SAC Student's Approximation")
+    plt.savefig('./visualizations/functions/SAC')
     plt.clf()
-
-
-
-
-
 
 if __name__ == "__main__":
     main()
