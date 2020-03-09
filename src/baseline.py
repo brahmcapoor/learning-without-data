@@ -25,10 +25,10 @@ def main():
         validation_path=DATA_PATH)
     obs = env.reset()
 
-    reward = float('-inf')
+    total_reward = float('-inf')
     prog = tqdm(
         range(config.MAX_QUERIES),
-        postfix={'Reward': reward}
+        postfix={'Reward': total_reward}
     )
 
     # Plot student's initialized predicted function
@@ -40,10 +40,12 @@ def main():
     plt.clf()'''
 
     actions = [] # For visualization
+    total_reward = 0.0
     for i in prog:
         action = np.random.uniform(-5, 5, size=(1,))
         obs, reward, done, info = env.step(action)
-        prog.set_postfix({'Reward': reward})
+        total_reward += reward
+        prog.set_postfix({'Reward': total_reward})
         actions.append(np.asscalar(action)) 
     plt.hist(actions, bins=config.NUM_BINS, range=(-5, 5), density=True)
     plt.savefig('./visualizations/histograms/random')
@@ -60,6 +62,7 @@ def main():
     outputs = env.student_model(inputs.reshape(-1, 1))
     plt.scatter(inputs, outputs, s=0.1, label='Random')
     plt.title("Random Student's Approximation")
+    plt.ylim((-60, 100))
     plt.savefig('./visualizations/functions/random')
     plt.clf()
 
