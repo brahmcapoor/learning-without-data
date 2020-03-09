@@ -1,1 +1,2 @@
 from learningwithoutdata.envs.teaching_env import TeachingEnv
+from learningwithoutdata.envs.teaching_env_discrete import TeachingEnvDiscrete
