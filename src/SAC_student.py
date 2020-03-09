@@ -14,6 +14,15 @@ import config
 
 DATA_PATH = "../data/synthetic_data/first_dataset"
 
+def select_action(agent_model, obs, epsilon=config.EPSILON_EXPLORATION):
+    action = None
+    if np.random.rand() <= epsilon:
+        action =  np.random.uniform(-5, 5, size=(1,))
+    else:
+        action, _states = agent_model.predict(obs, deterministic=False)
+    return action
+
+
 def main():
     env = gym.make(
         "teaching-env-v0",
@@ -24,13 +33,11 @@ def main():
         ),
         validation_path=DATA_PATH,
         max_queries=config.MAX_QUERIES)
-    agent_model = SAC(MlpPolicy, env, train_freq=1, batch_size=1, learning_rate=3e-4, learning_starts=0, buffer_size=5, random_exploration=config.EPSILON_EXPLORATION, gamma=config.GAMMA, verbose=1)
-    agent_model.learn(total_timesteps=config.MAX_QUERIES * config.NUM_TRAIN_EPISODES)
+    agent_model = SAC(MlpPolicy, env, train_freq=1, batch_size=64, learning_rate=3e-4, learning_starts=0, buffer_size=1000, random_exploration=config.EPSILON_EXPLORATION, gamma=config.GAMMA, verbose=1)
+    #agent_model.learn(total_timesteps=config.MAX_QUERIES * config.NUM_TRAIN_EPISODES)
+    #agent_model.save('test_SAC')
 
-    # TODO: REMOVE This shouldn't be useful
-    agent_model.save('test_SAC')
-    del agent_model # remove to demonstrate saving and loading
-    agent_model = SAC.load('test_SAC')
+    agent_model.load('test_SAC', env=env)
 
     obs = env.reset()
 
@@ -43,7 +50,8 @@ def main():
     actions = [] # For visualization
     total_reward = 0.0
     for i in prog:
-        action, _states = agent_model.predict(obs)
+        action = select_action(agent_model, obs, epsilon=config.EPSILON_EXPLORATION)
+        #action, _states = agent_model.predict(obs, deterministic=False)
         obs, reward, done, info = env.step(action)
         total_reward += reward
         prog.set_postfix({'Reward': total_reward})
