@@ -13,9 +13,10 @@ from models.teacher_model import TeacherModel
 
 class TeachingEnvDiscrete(gym.Env):
 
-    def __init__(self, teacher_path, validation_path, max_queries=100):
+    def __init__(self, teacher_path, validation_path, max_queries=100, student_lr=0.1):
         self.sess = tf.Session()
         self.teacher_path = teacher_path
+        self.student_lr = student_lr
 
         self.validation_inputs = np.load(os.path.join(
             validation_path, "inputs.npz")
@@ -40,7 +41,7 @@ class TeachingEnvDiscrete(gym.Env):
             target_dim=1,
             layers=[4, 4],
             activation=tf.nn.sigmoid,
-            lr=0.01
+            lr=self.student_lr
         )
         # self.sess.run(tf.global_variables_initializer())
 
@@ -50,20 +51,30 @@ class TeachingEnvDiscrete(gym.Env):
         self.observation_space_low = -np.inf  # TODO
         self.observation_space_high = np.inf  # TODO
 
-        self.action_space = spaces.Discrete(11) # Set with 11 elements {0, 1, 2, ..., 10}
+        self.num_discrete_actions = 1000
+        self.action_space = spaces.Discrete(1000) # Set with 11 elements {0, 1, 2, ..., 10}
+        self.actions = np.linspace(-5, 5, self.num_discrete_actions)
 
+        self.history_len = 10
         self.observation_space = spaces.Box(
             low=self.observation_space_low,
             high=self.observation_space_high,
-            shape=(self.student_model.num_weights + 4, )
+            shape=(4 * self.history_len, )
         )
+
+        _, self.previous_val_loss = self.student_model.validate(
+            self.validation_inputs,
+            self.validation_targets
+        )
+
+        self.state_queue = [0.0, 0.0, 0.0, 0.0] * self.history_len
 
     def step(self, action):
         """
         Action is a (1,) numpy array
         """
+        action = np.asarray([np.asscalar(self.actions[np.asscalar(action)])]) # Shape (1,)
         action = action.reshape(-1, 1)  # dimensionality case
-        action = action - 5;
         #print(action) #scale action back
         teacher_output = self.teacher_model(action)
         student_output, MSE_loss, _ = self.student_model.train_step(
@@ -73,24 +84,20 @@ class TeachingEnvDiscrete(gym.Env):
             self.validation_inputs,
             self.validation_targets
         )
-        obs = np.hstack(
-            [
-                self.student_model.weights,
-                np.array(
-                    [
-                        np.asscalar(action),
-                        np.asscalar(teacher_output),
-                        np.asscalar(student_output),
-                        MSE_loss
-                    ]
-                )
-            ]
-        )
+        self.state_queue.append(np.asscalar(action))
+        self.state_queue.append(np.asscalar(teacher_output))
+        self.state_queue.append(np.asscalar(student_output))
+        self.state_queue.append(MSE_loss)
+        for i in range(4):
+            self.state_queue.pop(0)
+        obs = np.asarray(self.state_queue)
         info = {}
         self.student_queries += 1
         done = (self.student_queries == self.max_queries)
+        reward = self.previous_val_loss - validation_loss
+        self.previous_val_loss = validation_loss
         # state, reward, isterminal, metadata
-        return (obs, -validation_loss, done, info)
+        return (obs, reward, done, info)
 
     def reset(self):
         """
@@ -98,7 +105,8 @@ class TeachingEnvDiscrete(gym.Env):
         initialization state
         """
         self.student_queries = 0
-        obs = np.hstack([self.student_model.weights, np.zeros((4,))])
+        self.state_queue = [0.0, 0.0, 0.0, 0.0] * self.history_len
+        obs = np.zeros((4 * self.history_len,))
         tf.reset_default_graph()
         self.teacher_model = TeacherModel(
             input_dim=1,
@@ -114,7 +122,11 @@ class TeachingEnvDiscrete(gym.Env):
             target_dim=1,
             layers=[4, 4],
             activation=tf.nn.sigmoid,
-            lr=0.01
+            lr=self.student_lr
+        )
+        _, self.previous_val_loss = self.student_model.validate(
+            self.validation_inputs,
+            self.validation_targets
         )
         return obs
 

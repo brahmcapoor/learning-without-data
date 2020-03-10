@@ -13,7 +13,7 @@ from models.teacher_model import TeacherModel
 
 class TeachingEnv(gym.Env):
 
-    def __init__(self, teacher_path, validation_path, max_queries=100, student_lr=0.1):
+    def __init__(self, teacher_path, validation_path, max_queries=100, student_lr=0.2):
         self.sess = tf.Session()
         self.teacher_path = teacher_path
         self.student_lr = student_lr
@@ -63,7 +63,7 @@ class TeachingEnv(gym.Env):
             high=self.observation_space_high,
             shape=(self.student_model.num_weights + 4, )
         )'''
-        self.history_len = 1000
+        self.history_len = 10
         self.observation_space = spaces.Box(
             low=self.observation_space_low,
             high=self.observation_space_high,
