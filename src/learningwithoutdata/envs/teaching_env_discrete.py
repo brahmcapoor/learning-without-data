@@ -52,7 +52,7 @@ class TeachingEnvDiscrete(gym.Env):
         self.observation_space_high = np.inf  # TODO
 
         self.num_discrete_actions = 1000
-        self.action_space = spaces.Discrete(1000) # Set with 11 elements {0, 1, 2, ..., 10}
+        self.action_space = spaces.Discrete(self.num_discrete_actions) # Set with 11 elements {0, 1, 2, ..., 10}
         self.actions = np.linspace(-5, 5, self.num_discrete_actions)
 
         self.history_len = 10
