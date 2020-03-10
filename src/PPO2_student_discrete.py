@@ -27,7 +27,12 @@ def main():
         validation_path=DATA_PATH,
         max_queries=config.MAX_QUERIES)
     agent_model = PPO2(MlpPolicy, env, gamma=1.0, n_steps=64, verbose=1)
+    # Uncomment if training 
     agent_model.learn(total_timesteps=config.MAX_QUERIES * config.NUM_TRAIN_EPISODES, log_interval=10)
+    agent_model.save('test_PPO_discrete')
+
+    # Uncomment if loading model
+    #agent_model.load('test_PPO2_discrete')
 
     obs = env.reset()
 

@@ -25,7 +25,12 @@ def main():
         validation_path=DATA_PATH,
         max_queries=config.MAX_QUERIES)
     agent_model = PPO2(MlpPolicy, env, gamma=1.0, n_steps=64, verbose=1)
-    agent_model.learn(total_timesteps=config.MAX_QUERIES * config.NUM_TRAIN_EPISODES, log_interval=10)
+    # Uncomment if training
+    #agent_model.learn(total_timesteps=config.MAX_QUERIES * config.NUM_TRAIN_EPISODES, log_interval=10)
+    #agent_model.save('test_PPO2')
+
+    # Uncomment if loading model
+    agent_model.load('test_PPO2')
 
     obs = env.reset()
 
@@ -38,7 +43,7 @@ def main():
     total_reward = 0.0
     actions = [] # For visualization
     for i in prog:
-        action, _states = agent_model.predict(obs)
+        action, _states = agent_model.predict(obs, deterministic=False)
         obs, reward, done, info = env.step(action)
         total_reward += reward
         prog.set_postfix({'Reward': total_reward})
